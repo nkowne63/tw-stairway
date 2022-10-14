@@ -71,7 +71,7 @@ pub async fn get_replying_users(user_name: String) -> Result<Vec<NumericId>, Err
 pub async fn get_user_by_id(id: NumericId) -> Result<User, Error> {
     let user = CLIENT
         .get_user(id)
-        .user_fields([UserField::Username])
+        .user_fields([UserField::Username, UserField::Description])
         .send()
         .await?
         .into_data()
