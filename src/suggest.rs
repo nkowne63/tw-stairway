@@ -5,37 +5,41 @@ use twitter_v2::{Error, User};
 
 use crate::{
     env::get_self_user,
-    relation::{get_related_ids, get_replying_users, Relation},
-    utils::get_user_by_id,
+    relation::{get_related_ids, get_replying_users, get_user_by_id, Relation},
+    utils::{pick_random_iter, vec2btree},
 };
 
+static SEARCH_SIZE: usize = 16;
+
 pub async fn get_suggested_users() -> Result<Vec<User>, Error> {
+    // 自身を取得
     let self_user = get_self_user().await?;
     println!("self user: {:#?}", self_user);
+    // 自分のフォロワーを取得
     let self_followers = get_related_ids(self_user.id, Relation::Followers).await?;
-    let (first_chunk, _) = self_followers.split_at(128);
-    println!("first_chunk.len() = {:#?}", first_chunk.len());
+    // フォロワーからランダムな数を選び、それらへのリプライをしているユーザーを取得
+    let random_chunk = pick_random_iter(&self_followers, SEARCH_SIZE);
+    println!("first_chunk.len() = {:#?}", random_chunk.len());
     let replying_users_distinct = join_all(
-        first_chunk
+        random_chunk
             .iter()
             .map(|u| async move { get_replying_users(u.username.clone()).await }),
     )
     .await;
+    // リプライをしているユーザーからフォロワーと自分を除く
+    let mut remove_id_set = vec2btree(self_followers.iter().map(|u| u.id).collect());
+    remove_id_set.insert(self_user.id);
     let replying_users_distinct = replying_users_distinct
         .iter()
         .flatten()
         .flat_map(|v| v.iter())
-        .filter(|nid| {
-            !self_followers.iter().map(|u| u.id).any(|x| x == **nid) && nid != &&self_user.id
-        })
         .copied()
         .collect::<BTreeSet<_>>();
-    let replying_users_distinct = join_all(
-        replying_users_distinct
-            .iter()
-            .map(|nid| async move { get_user_by_id(*nid).await }),
-    )
-    .await;
+    let replying_users_distinct = replying_users_distinct.difference(&remove_id_set);
+    // リプライをしているユーザーのユーザー情報を取得
+    let replying_users_distinct =
+        join_all(replying_users_distinct.map(|nid| async move { get_user_by_id(*nid).await }))
+            .await;
     let replying_users_distinct = replying_users_distinct
         .iter()
         .flatten()

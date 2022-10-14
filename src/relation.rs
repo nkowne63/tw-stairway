@@ -1,5 +1,9 @@
 use crate::env::CLIENT;
-use twitter_v2::{id::NumericId, query::TweetField, ApiPayload, Error, User};
+use twitter_v2::{
+    id::NumericId,
+    query::{TweetField, UserField},
+    ApiPayload, Error, User,
+};
 
 pub enum Relation {
     Following,
@@ -62,6 +66,17 @@ pub async fn get_replying_users(user_name: String) -> Result<Vec<NumericId>, Err
         .map(|t| t.author_id.unwrap())
         .collect::<Vec<_>>();
     Ok(author_ids)
+}
+
+pub async fn get_user_by_id(id: NumericId) -> Result<User, Error> {
+    let user = CLIENT
+        .get_user(id)
+        .user_fields([UserField::Username])
+        .send()
+        .await?
+        .into_data()
+        .unwrap();
+    Ok(user)
 }
 
 #[cfg(test)]

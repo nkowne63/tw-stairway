@@ -1,14 +1,16 @@
-use twitter_v2::{id::NumericId, query::UserField, Error, User};
+use rand::seq::SliceRandom;
+use std::collections::BTreeSet;
 
-use crate::env::CLIENT;
+pub fn vec2btree<T: Ord>(v: Vec<T>) -> BTreeSet<T> {
+    v.into_iter().collect()
+}
 
-pub async fn get_user_by_id(id: NumericId) -> Result<User, Error> {
-    let user = CLIENT
-        .get_user(id)
-        .user_fields([UserField::Username])
-        .send()
-        .await?
-        .into_data()
-        .unwrap();
-    Ok(user)
+pub fn pick_random_iter<S>(s: &S, n: usize) -> Vec<S::Item>
+where
+    S: IntoIterator + Clone,
+{
+    let mut rand = rand::thread_rng();
+    let mut v = s.clone().into_iter().collect::<Vec<_>>();
+    v.shuffle(&mut rand);
+    v.into_iter().take(n).collect()
 }
